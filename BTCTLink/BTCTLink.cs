@@ -11,7 +11,7 @@
 * - Order book specific asset
 * - Contract data asset
 * X All trades last 48h
-* - Trade history specific asset
+* X Trade history specific asset
 * - All dividends last 48h
 * - All dividends specific asset
 *
@@ -35,10 +35,10 @@
 */
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Globalization;
 using System.Runtime.Serialization;
 using OAuth;
 using Newtonsoft.Json.Linq;
@@ -51,165 +51,11 @@ namespace BTCTC
     public enum OrderType { OT_SELL, OT_BUY, OT_CALL, OT_PUT, OT_TIN, OT_TOUT, OT_UNKNOWN };
     public enum AuthStatusType { AS_NONE, AS_REQRCV, AS_OK };
     public enum SecurityType { ST_BOND, ST_STOCK, ST_FUND, ST_UNKNOWN };
+    public enum DividendStatus { DS_COMPLETE, DS_QUEUED, DS_CANCELLED };
 
     public delegate void AuthStatusChangedFunc(AuthStatusType newAS);
     public delegate void DebugHandler(string msg);
-
-    public class AuthStatusChangedEventArgs : EventArgs
-    {
-        public AuthStatusType AuthStatus { get; set; }
-
-        public AuthStatusChangedEventArgs(AuthStatusType t)
-        {
-            AuthStatus = t;
-        }
-    }
-
-    public class BTCTUtils
-    {
-        public const double SatoshiPerBTC = 100000000.0;
-
-        public static string ParseTickerString(string s)
-        {
-            if (s == "--" || s == "" || s == null)
-                return "0";
-            return s;
-        }
-
-        public static long DoubleToSatoshi(double t)
-        {
-            return Convert.ToInt64(SatoshiPerBTC * t);
-        }
-
-        public static double SatoshiToDouble(long i)
-        {
-            return ((double)i) / SatoshiPerBTC;
-        }
-
-        public static long StringToSatoshi(string s)
-        {
-            double t;
-
-            try
-            {
-                t = double.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
-            }
-            catch (Exception e)
-            {
-                t = 0.0;
-            }
-
-            return Convert.ToInt64(SatoshiPerBTC * t);
-        }
-
-        public static string SatoshiToString(long i)
-        {
-            double t = ((double)i) / SatoshiPerBTC;
-            NumberFormatInfo n = new CultureInfo("en-US", false).NumberFormat;
-
-            return t.ToString(n);
-        }
-
-        public static OrderType StringToOrderType(string s)
-        {
-            if (s == "ask" || s == "sell" || s == "Market Sell")
-            {
-                return OrderType.OT_SELL;
-            }
-            if (s == "bid" || s == "buy" || s == "Market Buy")
-            {
-                return OrderType.OT_BUY;
-            }
-            // 05-08-2013
-            // BTCT now includes usernames for transfers in the ordertype field
-            // e.g. "transfer-in (UserName)"
-            if (s.Contains("transfer-in"))
-            {
-                return OrderType.OT_TIN;
-            }
-            if (s.Contains("transfer-out"))
-            {
-                return OrderType.OT_TOUT;
-            }
-            if (s == "Call Option" || s == "option-buy")
-            {
-                return OrderType.OT_CALL;
-            }
-            if (s == "Put Option" || s == "option-sell")
-            {
-                return OrderType.OT_PUT;
-            }
-            return OrderType.OT_UNKNOWN;
-        }
-
-        public static SecurityType StringToSecurityType(string s)
-        {
-            if (s == "BOND")
-            {
-                return SecurityType.ST_BOND;
-            }
-            if (s == "STOCK")
-            {
-                return SecurityType.ST_STOCK;
-            }
-            if (s == "FUND")
-            {
-                return SecurityType.ST_FUND;
-            }
-            return SecurityType.ST_UNKNOWN;
-        }
-
-        public static DateTime UnixTimeStampToDateTime(long t)
-        {
-            DateTime d = new DateTime(1970, 1, 1, 0, 0, 0, 0);
-            d = d.AddSeconds(t).ToLocalTime();
-
-            return d;
-        }
-    }
-
-    #region Exceptions
-    [Serializable]
-    public class BTCTException : System.Exception
-    {
-        public BTCTException() : base() { }
-        public BTCTException(string message) : base(message) { }
-        public BTCTException(string message, System.Exception inner) : base(message, inner) { }
-
-        protected BTCTException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
-    }
-
-    [Serializable]
-    public class BTCTOrderException : BTCTException
-    {
-        public BTCTOrderException() : base() { }
-        public BTCTOrderException(string message) : base(message) { }
-        public BTCTOrderException(string message, System.Exception inner) : base(message, inner) { }
-
-        protected BTCTOrderException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
-    }
-
-    [Serializable]
-    public class BTCTBalanceException : BTCTException
-    {
-        public BTCTBalanceException() : base() { }
-        public BTCTBalanceException(string message) : base(message) { }
-        public BTCTBalanceException(string message, System.Exception inner) : base(message, inner) { }
-
-        protected BTCTBalanceException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
-    }
-
-    [Serializable]
-    public class BTCTAuthException : BTCTException
-    {
-        public BTCTAuthException() : base() { }
-        public BTCTAuthException(string message) : base(message) { }
-        public BTCTAuthException(string message, System.Exception inner) : base(message, inner) { }
-
-        protected BTCTAuthException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
-    }
-    #endregion
-
+    
     public class BTCTLink
     {
         private string _consumerKey;
@@ -565,43 +411,82 @@ namespace BTCTC
             return t;
         }
 
-        private TradeHistory parsePublicTradeHistory(string s)
+        private TradeHistory parsePublicTradeHistory(string s, bool isSingle)
         {
             List<Order> OList = new List<Order>();
             TradeHistory t = new TradeHistory();
-            Debug(s);
-            JObject r;
-            try
+
+            JContainer r;
+
+            if (s.ToUpper().Contains("INVALID TICKER"))
             {
-                r = JObject.Parse(s);
-            }
-            catch (Newtonsoft.Json.JsonReaderException ex)
-            {
-                throw (new BTCTException("Invalid response format."));
+                throw (new BTCTException("Invalid ticker."));
             }
 
-            foreach (JProperty ch in r.Children())
+            if (isSingle)
             {
-                Order o = new Order();
-                Security sec = new Security();
-                JToken c = ch.First;
-
-                if (c.HasValues)
+                try
                 {
+                    r = JArray.Parse(s);
+                }
+                catch (Newtonsoft.Json.JsonReaderException ex)
+                {
+                    throw (new BTCTException("Invalid response format."));
+                }
+            }
+            else
+            {
+                try
+                {
+                    r = JObject.Parse(s);
+                }
+                catch (Newtonsoft.Json.JsonReaderException ex)
+                {
+                    throw (new BTCTException("Invalid response format."));
+                }
+            }
+
+            if (!isSingle)
+            {
+                foreach (JProperty ch in r.Children())
+                {
+                    Order o = new Order();
+                    Security sec = new Security();
+             
+                    JToken c = ch.First;
+                    if (c.HasValues)
+                    {
+                        o.active = false;
+                        o.amount = Convert.ToInt32((string)c["quantity"]);
+                        o.dateTime = BTCTUtils.UnixTimeStampToDateTime(Convert.ToInt32((string)c["timestamp"]));
+                        o.price = BTCTUtils.StringToSatoshi((string)c["amount"]);
+                        o.orderType = BTCTUtils.StringToOrderType((string)c["type"]);
+                        sec.name = (string)c["ticker"];
+                        o.security = sec;
+                        OList.Add(o);
+                    }
+                }
+                t.lastUpdate = BTCTUtils.UnixTimeStampToDateTime(Convert.ToInt32((string)r.Last.First));
+            }
+            else
+            {
+                for (int i = 0; i < r.Count; i++)
+                {
+                    Order o = new Order();
+                    Security sec = new Security();
+             
                     o.active = false;
-                    o.amount = Convert.ToInt32((string)c["quantity"]);
-                    o.dateTime = BTCTUtils.UnixTimeStampToDateTime(Convert.ToInt32((string)c["timestamp"]));
-                    o.price = BTCTUtils.StringToSatoshi((string)c["amount"]);
-                    o.orderType = BTCTUtils.StringToOrderType((string)c["type"]);
-                    sec.name = (string)c["ticker"];
+                    o.amount = Convert.ToInt32((string)r[i]["quantity"]);
+                    o.dateTime = BTCTUtils.UnixTimeStampToDateTime(Convert.ToInt32((string)r[i]["timestamp"]));
+                    o.price = BTCTUtils.StringToSatoshi((string)r[i]["amount"]);
+                    o.orderType = BTCTUtils.StringToOrderType((string)r[i]["type"]);
+                    sec.name = (string)r[i]["ticker"];
                     o.security = sec;
                     OList.Add(o);
-
                 }
-
             }
             t.orders = OList;
-            t.lastUpdate = BTCTUtils.UnixTimeStampToDateTime(Convert.ToInt32((string)r.Last.First));
+
             return t;
         }
 
@@ -916,12 +801,33 @@ namespace BTCTC
             return parseTickerList(s);
         }
 
+        /* -- GetPublicTradeHistory() -- Obtain trade history for single asset of site-wide --
+         * Call the function without arguments to obtain the entire trade history
+        *  of the last 48h. For a specific ticker, use the second function.
+        *  The rangeAll argument is used to obtain the full trade history (rangeAll = true)
+        *  for the given ticker or just the last 30 days (rangeAll = false).
+        */
         public TradeHistory GetPublicTradeHistory()
         {
-            string s = rawHttpRequest(_baseUrl + _openUrl + "tradeHistory");
-
-            return parsePublicTradeHistory(s);
+            return GetPublicTradeHistory("", false);
         }
+        public TradeHistory GetPublicTradeHistory(string ticker, bool rangeAll)
+        {
+            string request = _baseUrl + _openUrl + "tradeHistory";
+            if (ticker != "")
+            {
+                request += "/" + ticker.ToUpper();
+                if (rangeAll)
+                {
+                    request += "?range=all";
+                }
+            }
+
+            string s = rawHttpRequest(request);
+
+            return parsePublicTradeHistory(s, ticker != "");
+        }
+
     }
 
     #region Data Storage Classes
@@ -962,6 +868,7 @@ namespace BTCTC
             }
         }
         public DateTime dateTime { get; set; }
+        public DividendStatus status { get; set; }
     }
 
     public class Security

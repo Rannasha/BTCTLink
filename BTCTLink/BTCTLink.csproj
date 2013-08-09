@@ -44,6 +44,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BTCTLink.cs" />
+    <Compile Include="BTCTUtils.cs" />
     <Compile Include="OAuthBase.cs" />
     <Compile Include="OAuthConfig.cs" />
     <Compile Include="OAuthConsumer.cs" />

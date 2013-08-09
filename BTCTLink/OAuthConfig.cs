@@ -1,4 +1,9 @@
-﻿using System;
+﻿/* sharpOAuth
+ * 
+ * OAuth library by samo9789, modified for BTCT-API by Rannasha
+ * Original version: https://github.com/samo9789/sharpOAuth
+ */
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
