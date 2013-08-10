@@ -250,18 +250,19 @@ namespace BTCTC
 
                 string[] fields = lines[i].Split(new Char[] { ',' });
 
-                se.name = fields[0];
-                o.orderType = BTCTUtils.StringToOrderType(fields[1]);
+                o.id = Convert.ToInt32(fields[0]);
+                se.name = fields[1];
+                o.orderType = BTCTUtils.StringToOrderType(fields[2]);
                 if (o.orderType == OrderType.OT_TIN || o.orderType == OrderType.OT_TOUT)
                 {
-                    int start = fields[1].IndexOf('(');
-                    int stop = fields[1].IndexOf(')');
-                    o.transferUser = fields[1].Substring(start + 1, stop - start - 1);
+                    int start = fields[2].IndexOf('(');
+                    int stop = fields[2].IndexOf(')');
+                    o.transferUser = fields[2].Substring(start + 1, stop - start - 1);
                 }
-                o.amount = Convert.ToInt32(fields[2]);
-                o.price = BTCTUtils.StringToSatoshi(fields[3]);
+                o.amount = Convert.ToInt32(fields[3]);
+                o.price = BTCTUtils.StringToSatoshi(fields[4]);
                 // date/time string comes in quotes from BTCT for some reason.
-                o.dateTime = DateTime.Parse(fields[4].Substring(1, fields[4].Length - 2));
+                o.dateTime = DateTime.Parse(fields[5].Substring(1, fields[5].Length - 2));
                 o.security = se;
 
                 OList.Add(o);
