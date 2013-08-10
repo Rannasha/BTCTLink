@@ -457,6 +457,7 @@ namespace BTCTC
                     if (c.HasValues)
                     {
                         o.active = false;
+                        o.id = Convert.ToInt32((string)c["trade_id"]);
                         o.amount = Convert.ToInt32((string)c["quantity"]);
                         o.dateTime = BTCTUtils.UnixTimeStampToDateTime(Convert.ToInt32((string)c["timestamp"]));
                         o.price = BTCTUtils.StringToSatoshi((string)c["amount"]);
@@ -476,6 +477,7 @@ namespace BTCTC
                     Security sec = new Security();
              
                     o.active = false;
+                    o.id = Convert.ToInt32((string)r[i]["trade_id"]);
                     o.amount = Convert.ToInt32((string)r[i]["quantity"]);
                     o.dateTime = BTCTUtils.UnixTimeStampToDateTime(Convert.ToInt32((string)r[i]["timestamp"]));
                     o.price = BTCTUtils.StringToSatoshi((string)r[i]["amount"]);
@@ -792,6 +794,13 @@ namespace BTCTC
 
             _oauthConsumer.OauthConfig.ApiKey = apikey;
             return parseDividendHistory(s);
+        }
+
+        public Ticker GetTicker(string ticker)
+        {
+            string s = rawHttpRequest(_baseUrl + _openUrl + "ticker/" + ticker);
+
+            return parseSingleTicker(s);
         }
 
         public List<Ticker> GetTickers()
