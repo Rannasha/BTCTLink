@@ -109,7 +109,43 @@ namespace BTCTC
             {
                 return SecurityType.ST_FUND;
             }
+            if (s == "REVENUE SHARE")
+            {
+                return SecurityType.ST_REVSHARE;
+            }
+            if (s == "MINING CONTRACT")
+            {
+                return SecurityType.ST_MINING;
+            }
+            if (s == "DEPOSITARY RECEIPT")
+            {
+                return SecurityType.ST_PASSTHROUGH;
+            } 
+            if (s == "LOAN")
+            {
+                return SecurityType.ST_LOAN;
+            }
+            if (s == "MANAGED PORTFOLIO")
+            {
+                return SecurityType.ST_PORTFOLIO;
+            }
             return SecurityType.ST_UNKNOWN;
+        }
+
+        public static DividendStatus StringToDivStatus(string s)
+        {
+            if (s == "COMPLETE")
+            {
+                return DividendStatus.DS_COMPLETE;
+            }
+            else if (s == "QUEUED")
+            {
+                return DividendStatus.DS_QUEUED;
+            }
+            else
+            {
+                return DividendStatus.DS_CANCELED;
+            }
         }
 
         public static DateTime UnixTimeStampToDateTime(long t)

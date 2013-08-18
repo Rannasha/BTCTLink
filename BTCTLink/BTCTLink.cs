@@ -7,13 +7,13 @@
 *
 * OPEN / JSON
 * X All assets & market data
-* - Ticker specific asset
+* X Ticker specific asset
 * - Order book specific asset
-* - Contract data asset
+* X Contract data asset
 * X All trades last 48h
 * X Trade history specific asset
-* - All dividends last 48h
-* - All dividends specific asset
+* X All dividends last 48h
+* X All dividends specific asset
 *
 * API-KEY / JSON
 * - Personal portfolio, optional history-feature
@@ -50,8 +50,8 @@ namespace BTCTC
 {
     public enum OrderType { OT_SELL, OT_BUY, OT_CALL, OT_PUT, OT_TIN, OT_TOUT, OT_UNKNOWN };
     public enum AuthStatusType { AS_NONE, AS_REQRCV, AS_OK };
-    public enum SecurityType { ST_BOND, ST_STOCK, ST_FUND, ST_UNKNOWN };
-    public enum DividendStatus { DS_COMPLETE, DS_QUEUED, DS_CANCELLED };
+    public enum SecurityType { ST_BOND, ST_STOCK, ST_FUND, ST_MINING, ST_PORTFOLIO, ST_PASSTHROUGH, ST_REVSHARE, ST_LOAN, ST_UNKNOWN };
+    public enum DividendStatus { DS_COMPLETE, DS_QUEUED, DS_CANCELED };
 
     public delegate void AuthStatusChangedFunc(AuthStatusType newAS);
     public delegate void DebugHandler(string msg);
@@ -493,6 +493,83 @@ namespace BTCTC
             return t;
         }
 
+        private DividendHistory parsePublicDividendHistory(string s)
+        {
+            DividendHistory dh = new DividendHistory();
+            List<Dividend> dl = new List<Dividend>();
+            
+            JContainer r;
+
+            if (s.ToUpper().Contains("INVALID TICKER"))
+            {
+                throw (new BTCTException("Invalid ticker."));
+            }
+
+            try
+            {
+                r = JObject.Parse(s);
+            }
+            catch (Newtonsoft.Json.JsonReaderException ex)
+            {
+                throw (new BTCTException("Invalid response format."));
+            }
+
+            foreach (JProperty ch in r.Children())
+            {
+                Dividend d = new Dividend();
+                Security sec = new Security();
+
+                JToken c = ch.First;
+                if (c.HasValues)
+                {
+                    d.shares = Convert.ToInt32((string)c["shares_paid"]);
+                    d.shares = d.shares == 0 ? 1 : d.shares;
+                    d.id = Convert.ToInt32((string)c["id"]);
+                    d.dateTime = BTCTUtils.UnixTimeStampToDateTime(Convert.ToInt32((string)c["process_time"]));
+                    d.dividend = BTCTUtils.StringToSatoshi((string)c["amount"]) / d.shares;
+                    d.status = BTCTUtils.StringToDivStatus((string)c["status"]);
+                    sec.name = (string)c["ticker"];
+                    d.security = sec;
+                    dl.Add(d);
+                }
+            }
+            dh.lastUpdate = BTCTUtils.UnixTimeStampToDateTime(Convert.ToInt32((string)r.Last.First));
+            dh.dividends = dl;
+
+            return dh;
+        }
+
+        private ContractDetails parseContractDetails(string s)
+        {
+            ContractDetails c = new ContractDetails();
+            JObject r;
+
+            try
+            {
+                r = JObject.Parse(s);
+            }
+            catch (Newtonsoft.Json.JsonReaderException ex)
+            {
+                throw (new BTCTException("Invalid response format."));
+            }
+
+            Security sec = new Security();
+            sec.name = (string)r["Ticker"];
+            sec.type = BTCTUtils.StringToSecurityType((string)r["Type"]);
+            c.security = sec;
+            c.approved = ((string)r["Approved"]) == "1";
+            c.adminLock = ((string)r["Admin Lock"]) == "1";
+            c.publicTradeLock = ((string)r["Public Trade Lock"]) == "1";
+            c.issuerLock = ((string)r["Issuer Lock"]) == "1";
+            c.peerApproval = (string)r["Peer Approval"];
+            c.sharesIssued = Convert.ToInt32((string)r["Shares Issued"]);
+            c.sharesOutstanding = Convert.ToInt32((string)r["Shares Outstanding"]);
+            c.issuer = (string)r["Issuer"];
+            c.issuerDetail = (string)r["Issuer Detail"];
+
+            return c;
+        }
+
         private void parseSuccess(string json)
         {
             // THROW ALL THE EXCEPTIONS! |o/
@@ -811,7 +888,7 @@ namespace BTCTC
             return parseTickerList(s);
         }
 
-        /* -- GetPublicTradeHistory() -- Obtain trade history for single asset of site-wide --
+        /* -- GetPublicTradeHistory() -- Obtain trade history for single asset or site-wide --
          * Call the function without arguments to obtain the entire trade history
         *  of the last 48h. For a specific ticker, use the second function.
         *  The rangeAll argument is used to obtain the full trade history (rangeAll = true)
@@ -838,6 +915,36 @@ namespace BTCTC
             return parsePublicTradeHistory(s, ticker != "");
         }
 
+        /* -- GetPublicDividendHistory() -- Obtain dividend history for single asset or site-wide --
+         * Call the function without arguments to obtain the entire dividend history of the last
+         * 48h. For a specific ticker, use the second function.
+         * Cancelled dividends may not show their correct value.
+         */
+        public DividendHistory GetPublicDividendHistory()
+        {
+            return GetPublicDividendHistory("");
+        }
+        public DividendHistory GetPublicDividendHistory(string ticker)
+        {
+            string request = _baseUrl + _openUrl + "dividendHistory";
+            if (ticker != "")
+            {
+                request += "/" + ticker.ToUpper();
+            }
+
+            string s = rawHttpRequest(request);
+
+            return parsePublicDividendHistory(s);
+         }
+
+        public ContractDetails GetContractDetails(string ticker)
+        {
+            string request = _baseUrl + _openUrl + "assetContract/" + ticker;
+
+            string s = rawHttpRequest(request);
+
+            return parseContractDetails(s);
+        }
     }
 
     #region Data Storage Classes
@@ -868,6 +975,7 @@ namespace BTCTC
     public class Dividend
     {
         public Security security { get; set; }
+        public int id { get; set; }
         public int shares { get; set; }
         public long dividend { get; set; }
         public long totalDividend
@@ -954,6 +1062,21 @@ namespace BTCTC
             return 0;
         }
     }
+
+    public class ContractDetails
+    {
+        public Security security { get; set; }
+        public bool approved { get; set; }
+        public bool adminLock { get; set; }
+        public bool publicTradeLock { get; set; }
+        public bool issuerLock { get; set; }
+        public string peerApproval { get; set; }
+        public int sharesIssued { get; set; }
+        public int sharesOutstanding { get; set; }
+        public string issuer { get; set; }
+        public string issuerDetail { get; set; }
+    }
+
     #endregion
 
 }
