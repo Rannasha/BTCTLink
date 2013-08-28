@@ -8,7 +8,7 @@
 * OPEN / JSON
 * X All assets & market data
 * X Ticker specific asset
-* - Order book specific asset
+* X Order book specific asset
 * X Contract data asset
 * X All trades last 48h
 * X Trade history specific asset
@@ -539,6 +539,51 @@ namespace BTCTC
             return dh;
         }
 
+        private TradeHistory parseOrderBook(string s)
+        {
+            List<Order> OList = new List<Order>();
+            TradeHistory t = new TradeHistory();
+
+            JContainer r;
+
+            if (s.ToUpper().Contains("INVALID TICKER"))
+            {
+                throw (new BTCTException("Invalid ticker."));
+            }
+
+            try
+            {
+                r = JObject.Parse(s);
+            }
+            catch (Newtonsoft.Json.JsonReaderException ex)
+            {
+                throw (new BTCTException("Invalid response format."));
+            }
+            
+            foreach (JProperty ch in r.Children())
+            {
+                Order o = new Order();
+                Security sec = new Security();
+                
+                JToken c = ch.First;
+                if (c.HasValues)
+                {
+                    o.active = true;
+                    o.amount = Convert.ToInt32((string)c["quantity"]);
+                    o.dateTime = BTCTUtils.UnixTimeStampToDateTime(Convert.ToInt32((string)c["timestamp"]));
+                    o.price = BTCTUtils.StringToSatoshi((string)c["amount"]);
+                    o.orderType = BTCTUtils.StringToOrderType((string)c["buy_sell"]);
+                    sec.name = (string)c["ticker"];
+                    o.security = sec;
+                    OList.Add(o);
+                }
+            }
+            t.lastUpdate = BTCTUtils.UnixTimeStampToDateTime(Convert.ToInt32((string)r.Last.First));
+            t.orders = OList;
+            
+            return t;
+        }
+
         private ContractDetails parseContractDetails(string s)
         {
             ContractDetails c = new ContractDetails();
@@ -936,6 +981,15 @@ namespace BTCTC
 
             return parsePublicDividendHistory(s);
          }
+
+        public TradeHistory GetOrderBook(string ticker)
+        {
+            string request = _baseUrl + _openUrl + "orders/" + ticker.ToUpper();
+
+            string s = rawHttpRequest(request);
+
+            return parseOrderBook(s);
+        }
 
         public ContractDetails GetContractDetails(string ticker)
         {
