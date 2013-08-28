@@ -903,6 +903,26 @@ namespace BTCTC
             }
         }
 
+        public void TransferCoins(int amount, string userName, string comment)
+        {
+            List<QueryParameter> p = new List<QueryParameter>();
+
+            p.Add(new QueryParameter("act", "transfer_coins"));
+            p.Add(new QueryParameter("tsfr_amount", BTCTUtils.SatoshiToString(amount)));
+            if (comment != "") p.Add(new QueryParameter("tsfr_comment", comment));
+            p.Add(new QueryParameter("send_username", userName));
+
+            try
+            {
+                string r = rawOauthRequest(p);
+                parseSuccess(r);
+            }
+            catch (BTCTException e)
+            {
+                throw (e);
+            }
+        }
+
         public DividendHistory GetDividendHistory()
         {
             return GetDividendHistory(ApiKey);
