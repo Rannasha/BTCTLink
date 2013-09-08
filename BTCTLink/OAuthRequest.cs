@@ -146,7 +146,8 @@ namespace OAuth
             }
             if (oauthTokenSecret != null && oauthTokenSecret != String.Empty && oauthTokenSecret.Length > 0)
             {
-                parameters.Add(new QueryParameter("oauth_token_secret", oauthTokenSecret));
+            // [Rannasha 09-09-2013] Not sure why you would include the secret as part of the message, as this kinda undermines the security.
+            // parameters.Add(new QueryParameter("oauth_token_secret", oauthTokenSecret));
             }
             if (extraParameters != null)
             {
