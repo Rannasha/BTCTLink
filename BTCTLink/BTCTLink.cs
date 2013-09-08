@@ -1018,6 +1018,10 @@ namespace BTCTC
             return parseDividendHistory(s);
         }
 
+        /* -- GetTicker() -- Obtain tickerdata for a single security --
+         * Output is identical to GetTickers(), except that it is limited to a single
+         * security.
+         */
         public Ticker GetTicker(string ticker)
         {
             string s = rawHttpRequest(_baseUrl + _openUrl + "ticker/" + ticker);
@@ -1025,6 +1029,9 @@ namespace BTCTC
             return parseSingleTicker(s);
         }
 
+        /* -- GetTickers() -- Obtain a list of all tickers --
+         * Contains data such as last price, volume for different timeframes, etc...
+         */
         public List<Ticker> GetTickers()
         {
             string s = rawHttpRequest(_baseUrl + _openUrl + "ticker");
@@ -1081,6 +1088,10 @@ namespace BTCTC
             return parsePublicDividendHistory(s);
          }
 
+        /* -- GetOrderBook() -- Obtain the full order book for a single security --
+         * The order book is ordered by price. The TradeHistory class is used to hold the data
+         * since it is the most suited for this, despite its name.
+         */
         public TradeHistory GetOrderBook(string ticker)
         {
             string request = _baseUrl + _openUrl + "orders/" + ticker.ToUpper();
@@ -1090,6 +1101,10 @@ namespace BTCTC
             return parseOrderBook(s);
         }
 
+        /* -- GetContractDetails() -- Obtain details about a single security. --
+         * Despite the name, it contains more than just the contract, but also voting scores,
+         * lock status, etc...
+         */
         public ContractDetails GetContractDetails(string ticker)
         {
             string request = _baseUrl + _openUrl + "assetContract/" + ticker;
