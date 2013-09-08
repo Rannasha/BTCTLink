@@ -1,39 +1,4 @@
-﻿/* BTCT API Features
-*
-* Implementation status:
-* - Not yet implemented
-* x Partially implemented
-* X Fully implemented
-*
-* OPEN / JSON
-* X All assets & market data
-* X Ticker specific asset
-* X Order book specific asset
-* X Contract data asset
-* X All trades last 48h
-* X Trade history specific asset
-* X All dividends last 48h
-* X All dividends specific asset
-*
-* API-KEY / JSON
-* - Personal portfolio, optional history-feature
-*
-* API-KEY / CSV
-* - Personal portfolio
-* X Trade history
-* X Dividend history
-* - Deposit history
-* - Withdrawal history
-*
-* OAUTH / JSON
-* X Personal portfolio
-* X Transfer asset
-* - Transfer coins
-* X Submit ask
-* X Submit bid
-* X Cancel order
-*/
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -70,7 +35,7 @@ namespace BTCTC
         private string _coin;
 
         public DebugHandler DebugHandler { get; set; }
-
+        public event EventHandler AuthStatusChanged;
         public AuthStatusType AuthStatus
         {
             get
@@ -78,7 +43,6 @@ namespace BTCTC
                 return _authStatus;
             }
         }
-
         public string ApiKey
         {
             get
@@ -90,7 +54,6 @@ namespace BTCTC
                 _oauthConsumer.OauthConfig.ApiKey = value;
             }
         }
-
         public bool isBTCT
         {
             get
@@ -99,15 +62,15 @@ namespace BTCTC
             }
         }
 
-        public event EventHandler AuthStatusChanged;
-
         #region Private Methods
+        /* Debug() -- Send debug info to handler (if a handler has been specified). */
         private void Debug(string msg)
         {
             if (DebugHandler != null)
                 DebugHandler(msg);
         }
 
+        /* ChangeAuthStatus() -- Update the authentication status and fire AuthStatusChanged event */
         private void ChangeAuthStatus(AuthStatusType t)
         {
             if (_authStatus != t)
@@ -121,6 +84,7 @@ namespace BTCTC
             }
         }
 
+        /* rawOauthRequest() -- Send OAuth request to OAuth endpoint and return response string */
         private string rawOauthRequest(List<QueryParameter> p)
         {
             string response;
@@ -154,6 +118,7 @@ namespace BTCTC
             return response;
         }
 
+        /* rawHttpRequest() -- Submit HTTP-GET request to specified url and return response string */
         private string rawHttpRequest(string uri)
         {
             string c = String.Empty;
@@ -189,18 +154,19 @@ namespace BTCTC
             return c;
         }
 
-        private Portfolio parsePortfolio(string json)
+        /* parsePortfolio() -- Create Portfolio object from JSON string */
+        private Portfolio parsePortfolio(string json, bool isOAuth, bool isHistory)
         {
             JObject r = JObject.Parse(json);
             Portfolio pf = new Portfolio();
 
             // Parse simple fields like username & generation time.
-            pf.username = (string)r["username"];
             string st = (string)r["generated"];
             string[] formats = { "MM/dd/yyyy HH:mm:ss" };
             pf.lastUpdate = DateTime.ParseExact(st, formats, new CultureInfo("en-US"), DateTimeStyles.None);
-            pf.balance = BTCTUtils.StringToSatoshi((string)r["balance"][_coin]);
-            pf.apiKey = (string)r["api_key"];
+            if (isOAuth || !isHistory) pf.balance = BTCTUtils.StringToSatoshi((string)r["balance"][_coin]);
+            if (isOAuth) pf.apiKey = (string)r["api_key"];
+            if (isOAuth) pf.username = (string)r["username"];
 
             // Parse list of currently held securities.
             List<SecurityOwned> SOList = new List<SecurityOwned>();
@@ -215,26 +181,34 @@ namespace BTCTC
             pf.securities = SOList;
 
             // Parse list of active orders
-            List<Order> OList = new List<Order>();
-            foreach (JProperty c in r["orders"].Children())
+            if (isOAuth)
             {
-                Order o = new Order();
-                Security s = new Security();
-                o.id = Convert.ToInt32(c.Name);
-                JToken c2 = c.First;
-                s.name = (string)c2["ticker"];
-                o.security = s;
-                o.amount = Convert.ToInt32((string)c2["quantity"]);
-                o.price = BTCTUtils.StringToSatoshi((string)c2["amount"]);
-                o.orderType = BTCTUtils.StringToOrderType((string)c2["type"]);
+                List<Order> OList = new List<Order>();
+                foreach (JProperty c in r["orders"].Children())
+                {
+                    Order o = new Order();
+                    Security s = new Security();
+                    o.id = Convert.ToInt32(c.Name);
+                    JToken c2 = c.First;
+                    s.name = (string)c2["ticker"];
+                    o.security = s;
+                    o.amount = Convert.ToInt32((string)c2["quantity"]);
+                    o.price = BTCTUtils.StringToSatoshi((string)c2["amount"]);
+                    o.orderType = BTCTUtils.StringToOrderType((string)c2["type"]);
 
-                OList.Add(o);
+                    OList.Add(o);
+                }
+                pf.orders = OList;
             }
-            pf.orders = OList;
-
+            
             return pf;
         }
+        private Portfolio parsePortfolio(string json, bool isOAuth)
+        {
+            return parsePortfolio(json, isOAuth, false);
+        }
 
+        /* parseTradeHistory() -- Create TradeHistory object from string containing CSV-data */
         private TradeHistory parseTradeHistory(string s)
         {
             List<Order> OList = new List<Order>();
@@ -273,6 +247,7 @@ namespace BTCTC
             return t;
         }
 
+        /* parseDividendHistory() -- Create DividendHistory object from string containing CSV-data */
         private DividendHistory parseDividendHistory(string s)
         {
             DividendHistory dh = new DividendHistory();
@@ -302,6 +277,7 @@ namespace BTCTC
             return dh;
         }
 
+        /* parseTicker() -- Create Ticker object from JSON string */
         private Ticker parseTicker(JToken j)
         {
             Ticker t = new Ticker();
@@ -363,6 +339,7 @@ namespace BTCTC
             return t;
         }
 
+        /* parseTickerList() -- Create a List of Ticker objects from JSON string */
         private List<Ticker> parseTickerList(string s)
         {
             List<Ticker> lt = new List<Ticker>();
@@ -392,6 +369,7 @@ namespace BTCTC
             return lt;
         }
 
+        /* parseSingleTicker() -- Create Ticker object from JSON string. Calls parseTicker for part of the parsing */
         private Ticker parseSingleTicker(string s)
         {
             JObject r;
@@ -412,6 +390,7 @@ namespace BTCTC
             return t;
         }
 
+        /* parsePublicTradeHistory() -- Create TradeHistory object from JSON string */
         private TradeHistory parsePublicTradeHistory(string s, bool isSingle)
         {
             List<Order> OList = new List<Order>();
@@ -493,6 +472,7 @@ namespace BTCTC
             return t;
         }
 
+        /* parsePublicDividendHistory() -- Create DividendHistory object from JSON string */
         private DividendHistory parsePublicDividendHistory(string s)
         {
             DividendHistory dh = new DividendHistory();
@@ -539,6 +519,7 @@ namespace BTCTC
             return dh;
         }
 
+        /* parseOrderBook() -- Create TradeHistory object containing an orderbook from JSON string */
         private TradeHistory parseOrderBook(string s)
         {
             List<Order> OList = new List<Order>();
@@ -584,6 +565,7 @@ namespace BTCTC
             return t;
         }
 
+        
         private ContractDetails parseContractDetails(string s)
         {
             ContractDetails c = new ContractDetails();
@@ -613,6 +595,32 @@ namespace BTCTC
             c.issuerDetail = (string)r["Issuer Detail"];
 
             return c;
+        }
+
+        private DWHistory parseDWHistory(string s)
+        {
+            DWHistory dh = new DWHistory();
+
+            string[] lines = s.Split(new string[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries);
+
+            for (int i = 1; i < lines.Length; i++)
+            {
+                DWHistoryItem d = new DWHistoryItem();
+                
+                string[] fields = lines[i].Split(new Char[] { ',' });
+
+                if (fields[0][0] == '"') d.description = fields[0].Substring(1, fields[0].Length - 2);
+                else d.description = fields[0];
+                if (fields[1][0] == '"') d.transferId = fields[1].Substring(1, fields[1].Length - 2);
+                else d.transferId = fields[1];
+                d.amount = BTCTUtils.StringToSatoshi(fields[2]);
+                d.dateTime = DateTime.Parse(fields[3].Substring(1, fields[3].Length - 2));
+
+                dh.Items.Add(d);
+            }
+            dh.LastUpdate = DateTime.Now;
+
+            return dh;
         }
 
         private void parseSuccess(string json)
@@ -653,6 +661,10 @@ namespace BTCTC
                 else if (((string)r["error_message"]).Contains("Could not get asset lock."))
                 {
                     throw (new BTCTOrderException("Transfer error. Could not get asset lock."));
+                }
+                else if (json.IndexOf("Not enough funds for that amount") > -1)
+                {
+                    throw (new BTCTOrderException("Insufficient funds"));
                 }
                 else
                 {
@@ -785,7 +797,42 @@ namespace BTCTC
             try
             {
                 response = rawOauthRequest(p);
-                pf = parsePortfolio(response);
+                pf = parsePortfolio(response, true);
+            }
+            catch (BTCTException e)
+            {
+                throw e;
+            }
+
+            return pf;
+        }
+
+        public Portfolio GetPortfolioApi()
+        {
+            return GetPortfolioApi(ApiKey);
+        }
+        public Portfolio GetPortfolioApi(string apiKey)
+        {
+            return GetPortfolioApi(apiKey, 0);
+        }
+        public Portfolio GetPortfolioApi(int hist)
+        {
+            return GetPortfolioApi(ApiKey, hist);
+        }
+        public Portfolio GetPortfolioApi(string apiKey, int hist)
+        {
+            string response;
+            Portfolio pf;
+
+            try
+            {
+                string histStr = "";
+                if (hist > 0)
+                {
+                    histStr = "&range=" + hist.ToString();
+                }
+                response = rawHttpRequest(_baseUrl + _openUrl + "act?key=" + apiKey + histStr);
+                pf = parsePortfolio(response, false, (hist > 0));
             }
             catch (BTCTException e)
             {
@@ -903,7 +950,7 @@ namespace BTCTC
             }
         }
 
-        public void TransferCoins(int amount, string userName, string comment)
+        public void TransferCoins(long amount, string userName, string comment)
         {
             List<QueryParameter> p = new List<QueryParameter>();
 
@@ -923,6 +970,38 @@ namespace BTCTC
             }
         }
 
+        public DWHistory GetDepositHistory()
+        {
+            return GetDepositHistory(ApiKey);
+        }
+        public DWHistory GetDepositHistory(string apikey)
+        {
+            string s = rawHttpRequest(_baseUrl + _csvUrl + "deposits?key=" + apikey);
+            if (s.Contains("api key"))
+            {
+                throw (new BTCTAuthException("Invalid api key."));
+            }
+
+            _oauthConsumer.OauthConfig.ApiKey = apikey;
+            return parseDWHistory(s);
+        }
+
+        public DWHistory GetWithdrawalHistory()
+        {
+            return GetWithdrawalHistory(ApiKey);
+        }
+        public DWHistory GetWithdrawalHistory(string apikey)
+        {
+            string s = rawHttpRequest(_baseUrl + _csvUrl + "withdrawals?key=" + apikey);
+            if (s.Contains("api key"))
+            {
+                throw (new BTCTAuthException("Invalid api key."));
+            }
+
+            _oauthConsumer.OauthConfig.ApiKey = apikey;
+            return parseDWHistory(s);
+        }
+        
         public DividendHistory GetDividendHistory()
         {
             return GetDividendHistory(ApiKey);
@@ -1022,6 +1101,33 @@ namespace BTCTC
     }
 
     #region Data Storage Classes
+    public class DWHistory
+    {
+        public List<DWHistoryItem> Items;
+        public DateTime LastUpdate;
+
+        public DWHistoryItem this[int i]
+        {
+            get
+            {
+                return Items[i];
+            }
+        }
+
+        public DWHistory()
+        {
+            Items = new List<DWHistoryItem>();
+        }
+    }
+
+    public class DWHistoryItem
+    {
+        public string description;
+        public string transferId;
+        public long amount;
+        public DateTime dateTime;
+    }
+
     public class Ticker : Security
     {
         public long last { get; set; }
