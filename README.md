@@ -71,7 +71,7 @@ Rannasha - Developer (Bitcointalk: https://bitcointalk.org/index.php?action=prof
 samo9789 - sharpOAuth library (GitHub: https://github.com/samo9789/sharpOAuth)  
 Deprived - Testing & feedback (Bitcointalk: https://bitcointalk.org/index.php?action=profile;u=40149)
 
-*** CONTACT ***
+*** CONTACT ***  
 For questions and suggestions, contact Rannasha on Bitcointalk (see link in the previous section). Pull-requests with improvements on GitHub are also appreciated.
 
 If this library has been useful for you, consider sending a donation to 1Gideon33Q7ANGhCbfkxPHpWoNGz5Lyskm
