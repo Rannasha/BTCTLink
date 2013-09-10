@@ -1,4 +1,14 @@
-﻿using System;
+﻿/* -- BTCTLink -- A library for communication with the BTC-TC / LTC-Global API --
+ * 
+ * Developed by Rannasha (Bitcointalk.org: https://bitcointalk.org/index.php?action=profile;u=112258)
+ * 
+ * This file introduces the BTCTLink class that serves as an intermediary between a client
+ * program and the API of BTC-TC & LTC-Global, as well as several data storage classes that
+ * are used to store the output of the API requests.
+ * 
+ * For details and instructions, consult readme.md.
+ */
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -34,8 +44,17 @@ namespace BTCTC
         private bool _isBTCT;
         private string _coin;
 
+        /* The DebugHandler delegate method is called whenever a request returns a value.
+         * The response-string is passed to the DebugHandler, if it is set.
+         */
         public DebugHandler DebugHandler { get; set; }
+
+        /* AuthStatusChanged is called on changes in the OAuth authentication process.
+         * Subscribe to this event to update UI elements to guide the user through the
+         * authentication process.
+         */
         public event EventHandler AuthStatusChanged;
+
         public AuthStatusType AuthStatus
         {
             get
@@ -43,6 +62,7 @@ namespace BTCTC
                 return _authStatus;
             }
         }
+
         public string ApiKey
         {
             get
@@ -54,6 +74,7 @@ namespace BTCTC
                 _oauthConsumer.OauthConfig.ApiKey = value;
             }
         }
+
         public bool isBTCT
         {
             get
@@ -63,14 +84,16 @@ namespace BTCTC
         }
 
         #region Private Methods
-        /* Debug() -- Send debug info to handler (if a handler has been specified). */
+        /* -- Private Methods --
+         * These private methods are primarily used for parsing response strings for different API calls.
+         */
+
         private void Debug(string msg)
         {
             if (DebugHandler != null)
                 DebugHandler(msg);
         }
 
-        /* ChangeAuthStatus() -- Update the authentication status and fire AuthStatusChanged event */
         private void ChangeAuthStatus(AuthStatusType t)
         {
             if (_authStatus != t)
@@ -84,7 +107,6 @@ namespace BTCTC
             }
         }
 
-        /* rawOauthRequest() -- Send OAuth request to OAuth endpoint and return response string */
         private string rawOauthRequest(List<QueryParameter> p)
         {
             string response;
@@ -118,7 +140,6 @@ namespace BTCTC
             return response;
         }
 
-        /* rawHttpRequest() -- Submit HTTP-GET request to specified url and return response string */
         private string rawHttpRequest(string uri)
         {
             string c = String.Empty;
@@ -154,7 +175,6 @@ namespace BTCTC
             return c;
         }
 
-        /* parsePortfolio() -- Create Portfolio object from JSON string */
         private Portfolio parsePortfolio(string json, bool isOAuth, bool isHistory)
         {
             JObject r = JObject.Parse(json);
@@ -208,7 +228,6 @@ namespace BTCTC
             return parsePortfolio(json, isOAuth, false);
         }
 
-        /* parseTradeHistory() -- Create TradeHistory object from string containing CSV-data */
         private TradeHistory parseTradeHistory(string s)
         {
             List<Order> OList = new List<Order>();
@@ -247,7 +266,6 @@ namespace BTCTC
             return t;
         }
 
-        /* parseDividendHistory() -- Create DividendHistory object from string containing CSV-data */
         private DividendHistory parseDividendHistory(string s)
         {
             DividendHistory dh = new DividendHistory();
@@ -277,7 +295,6 @@ namespace BTCTC
             return dh;
         }
 
-        /* parseTicker() -- Create Ticker object from JSON string */
         private Ticker parseTicker(JToken j)
         {
             Ticker t = new Ticker();
@@ -339,7 +356,6 @@ namespace BTCTC
             return t;
         }
 
-        /* parseTickerList() -- Create a List of Ticker objects from JSON string */
         private List<Ticker> parseTickerList(string s)
         {
             List<Ticker> lt = new List<Ticker>();
@@ -369,7 +385,6 @@ namespace BTCTC
             return lt;
         }
 
-        /* parseSingleTicker() -- Create Ticker object from JSON string. Calls parseTicker for part of the parsing */
         private Ticker parseSingleTicker(string s)
         {
             JObject r;
@@ -390,7 +405,6 @@ namespace BTCTC
             return t;
         }
 
-        /* parsePublicTradeHistory() -- Create TradeHistory object from JSON string */
         private TradeHistory parsePublicTradeHistory(string s, bool isSingle)
         {
             List<Order> OList = new List<Order>();
@@ -472,7 +486,6 @@ namespace BTCTC
             return t;
         }
 
-        /* parsePublicDividendHistory() -- Create DividendHistory object from JSON string */
         private DividendHistory parsePublicDividendHistory(string s)
         {
             DividendHistory dh = new DividendHistory();
@@ -519,7 +532,6 @@ namespace BTCTC
             return dh;
         }
 
-        /* parseOrderBook() -- Create TradeHistory object containing an orderbook from JSON string */
         private TradeHistory parseOrderBook(string s)
         {
             List<Order> OList = new List<Order>();
@@ -565,7 +577,6 @@ namespace BTCTC
             return t;
         }
 
-        
         private ContractDetails parseContractDetails(string s)
         {
             ContractDetails c = new ContractDetails();
@@ -732,6 +743,19 @@ namespace BTCTC
         #endregion
 
         #region Access / token management
+
+        /* -- SerializeConfig() -- Saves authentication data from a file --
+         * This method stores authentication data to a file so that it can be recalled at a later time,
+         * allowing for easy access to the API without having to redo the OAuth authentication process
+         * or copy/pasting the API key.
+         * 
+         * Note that the contents of this file are sufficient to gain full access to the account associated
+         * with it (assuming that this method is called after successful authentication) and the file should
+         * be treated with care. Theft of the save-file is a potential security risk,
+         *          * 
+         * BTC-TC & LTC-Global let OAuth access tokens expire after 1 week of inactivity (or when a user
+         * manually cancels it), so the saved tokens may no longer be valid when they're loaded back in.
+         */
         public void SerializeConfig(string filename)
         {
             Stream f = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None);
@@ -740,6 +764,15 @@ namespace BTCTC
             f.Close();
         }
 
+        /* -- DeserializeConfig() -- Loads authentication data from a file --
+         * This method allows previously saved authentication data to be loaded from a file on disk.
+         * Note that this file contains all the information required to access the associated BTCT account
+         * and should be handled with care.
+         * 
+         * BTC-TC & LTC-Global let OAuth access tokens expire after 1 week of inactivity (or when a user
+         * manually cancels it), so the validity of the tokens that are loaded by the method isn't
+         * guaranteed.
+         */
         public void DeserializeConfig(string filename)
         {
             try
@@ -761,6 +794,7 @@ namespace BTCTC
             }
         }
 
+        /* -- GetRequestToken() -- Obtain the request token and open a browser window for authentication -- */
         public void GetRequestToken()
         {
             try
@@ -774,6 +808,7 @@ namespace BTCTC
             }
         }
 
+        /* -- GetAccessToken() -- Obtain the access token & secret, completing the OAuth authentication -- */
         public void GetAccessToken(string verifier)
         {
             try
@@ -788,6 +823,10 @@ namespace BTCTC
         }
         #endregion
 
+        /* -- GetPortFolio() -- Obtains the users portfolio using OAuth (rather than API key) --
+         * The OAuth method returns a list of securities owned and their amounts, but also includes 
+         * open orders, current coin-balance, username and API key.
+         */
         public Portfolio GetPortfolio()
         {
             string response;
@@ -807,6 +846,13 @@ namespace BTCTC
             return pf;
         }
 
+        /* -- GetPortFolioApi() -- Obtains the users portfolio using API key access (rather than OAuth) --
+         * The API key based request only returns a list of securities owned and their quantities. The OAuth
+         * method also includes open orders, current coin-balance, username and API key.
+         * 
+         * The optional "hist" parameter is the number of days to look back, allowing for a historical
+         * overview of the portfolio. This feature is not available to the OAuth method.
+         */
         public Portfolio GetPortfolioApi()
         {
             return GetPortfolioApi(ApiKey);
@@ -842,6 +888,14 @@ namespace BTCTC
             return pf;
         }
 
+        /* -- SubmitOrder() -- Submits a buy or sell order to the exchange --
+         * "security" = name of security to trade (note: all securities are uppercase)
+         * "amount" = number of units to buy/sell.
+         * "price" = price to buy/sell at in satoshis.
+         * "OrderType" = order type, OrderType.OT_BUY or OrderType.OT_SELL.
+         * "expire" = expiry time in days. Valid values are 0 (no expiry), 1, 7, 14, 30, 90. Note that an
+         * immediate order fee is charged if a non-zero expiry time is set.
+         */
         public void SubmitOrder(string security, int amount, long price, OrderType o, int expire)
         {
             string orderString;
@@ -881,6 +935,9 @@ namespace BTCTC
             }
         }
 
+        /* -- GetTradeHistory() -- Obtains the full trade history for a user --
+         * Trade history is an overview of all purcahses, sales, option executions and transfers.
+         */
         public TradeHistory GetTradeHistory()
         {
             return GetTradeHistory(ApiKey);
@@ -897,6 +954,9 @@ namespace BTCTC
             return parseTradeHistory(s);
         }
 
+        /* -- CancelOrder() -- Cancel an existing order --
+         * The orderId can be obtained from the users portfolio.
+         */
         public void CancelOrder(int orderId)
         {
             List<QueryParameter> p = new List<QueryParameter>();
@@ -918,12 +978,17 @@ namespace BTCTC
             }
         }
 
-        /* Potential errors and form of response-string:
-         * - Invalid Ticker (raw string)
-         * - Invalid Username (raw string)
-         * - Asset lock unobtainable (json errormessage) - Presumably happens when 
+        /* -- TransferAssets() -- Transfer assets to another user --
+         * "security" string should be in uppercase (all securities have uppercase names). The "transferPrice" argument
+         * (denominated in satoshis) is used in the users My Value Analysis page, but has no actual effect on the users
+         * balance.
+         * 
+         * Potential errors: 
+         * - Invalid Ticker
+         * - Invalid Username
+         * - Asset lock unobtainable - Presumably happens when 
          *   load on BTCT is too high for that particular asset
-         * - Insufficient Quantity (json errormessage)
+         * - Insufficient Quantity
          * 
          * Note that transfering cancels open Ask orders if insufficient free shares
          * are available. This is reported in the response-message, but currently not
@@ -950,6 +1015,13 @@ namespace BTCTC
             }
         }
 
+        /* -- TransferCoins() -- Transfer coins to another user --
+         * "amount" argument should be denominated in satoshis. The "comment" string is optional, leave empty for no comment.
+         * 
+         * Potential errors:
+         * - Invalid Username
+         * - Insufficient funds
+         */
         public void TransferCoins(long amount, string userName, string comment)
         {
             List<QueryParameter> p = new List<QueryParameter>();
@@ -970,6 +1042,10 @@ namespace BTCTC
             }
         }
 
+        /* -- GetDepositHistory() -- Obtain deposit history for the user --
+         * Note that deposits include any action that increases the balance of the user:
+         * Coin deposits, share sales, dividends, etc...
+         */
         public DWHistory GetDepositHistory()
         {
             return GetDepositHistory(ApiKey);
@@ -986,6 +1062,10 @@ namespace BTCTC
             return parseDWHistory(s);
         }
 
+        /* -- GetWithdrawalHistory() -- Obtain withdrawal history for the user --
+         * Note that withdrawals include any action that lowers the balance of the user:
+         * Coin withdrawals, share purchases, exchange fees, etc...
+         */
         public DWHistory GetWithdrawalHistory()
         {
             return GetWithdrawalHistory(ApiKey);
@@ -1002,6 +1082,8 @@ namespace BTCTC
             return parseDWHistory(s);
         }
         
+        /* -- GetDividendHistory() -- Obtain dividend history for the user --
+         */
         public DividendHistory GetDividendHistory()
         {
             return GetDividendHistory(ApiKey);

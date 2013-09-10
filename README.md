@@ -3,7 +3,7 @@ BTCTLink
 
 Library for communication with BTC-TC / Litecoin-Global API
 
-*** ABOUT ***  
+# ABOUT #
 This library introduces a C#/.NET class that serves as a wrapper between the API functions of the BTC-TC / Litecoin-Global API and a client program. The class allows for access to the open calls, the calls requiring a users API key as well as OAuth-based functionality that allows for orders and transfers to be made.
 
 The library consists of the following files:
@@ -13,7 +13,7 @@ OAuth*.cs -- OAuth library, sharpOAuth (https://github.com/samo9789/sharpOAuth),
 
 In addition, the JSON.NET library from Newtonsoft is used.
 
-*** HOW TO USE ***  
+# HOW TO USE #
 Instantiate a BTCTLink object:
 
 BTCTLink b = new BTCTLink(consumerKey, consumerSecret, true, null);
@@ -46,14 +46,14 @@ b.SubmitOrder("ASICMINER-PT", 123, BTCTUtils.DoubleToSatoshi(2.11), OrderType.OT
 
 The BTCTLink class, including the access-token and API key, is serializable, allowing users to save their login-token to file and connect more rapidly at a later time. Note that this function, if used, poses a potential security risk as the file containing the serialized BTCTLink object is all that is required to access the users account, including order submissions and transfers.
 
-*** FUNCTIONS ***  
+# FUNCTIONS #
 All API functions described in the BTC-TC FAQ (https://btct.co/faq) have been implemented with the exception of the API call using the API key to obtain the portfolio in CSV format (there are 2 alternative ways to obtain the portfolio which provide more information). All responses, where appropriate, are stored using a data storage class.
 
 In the event of an exception, be it from a network error, invalid input, etc..., a BTCTException is thrown which can be caught for error handling. Currently, the exception has a basic description of the error in its Message field.
 
 The BTCTLink class contains a single event, AuthStatusChanged, which is fired when a step in the OAuth authorization process is completed. Subscribe to this event to make your UI make the correct controls available. For debugging, a void-returning method taking a single string parameter can be added to the DebugHandler property of BTCTLink. DebugHandler outputs the raw response string from API requests.
 
-*** OAUTH - SHORT PRIMER ***  
+# OAUTH - SHORT PRIMER #
 OAuth is an authentication system that allows programs or websites to interact with a webservice and act on behalf of a user, having access to the users account on the webservice, to the extent allowed by the API of the webservice. OAuth uses pairs of a public key and private secret to sign requests to prevent MitM attacks.
 
 The authentication process starts with the consumer key/secret pair. This keypair is used to identify the application that is trying to access the API. This keypair is not linked to a specific user and is not necessarily confidential. The GetRequestToken() method obtains a request token, using the consumer key/secret. This request token is a non-user-specific temporary access token.
@@ -66,12 +66,12 @@ An OAuth request is structured by concatenating sets of key-value pairs: "key1=v
 
 One of the parameters of the request is always the access token (or consumer key in the first authentication stage). The server identifies the source of the request by this token and performs its own hashing procedure to compute and verify the signature. If the signature is valid, the request is processed and the result is returned as a string (using JSON).
 
-*** CREDITS ***  
+# CREDITS #
 Rannasha - Developer (Bitcointalk: https://bitcointalk.org/index.php?action=profile;u=112258)  
 samo9789 - sharpOAuth library (GitHub: https://github.com/samo9789/sharpOAuth)  
 Deprived - Testing & feedback (Bitcointalk: https://bitcointalk.org/index.php?action=profile;u=40149)
 
-*** CONTACT ***  
+# CONTACT #
 For questions and suggestions, contact Rannasha on Bitcointalk (see link in the previous section). Pull-requests with improvements on GitHub are also appreciated.
 
 If this library has been useful for you, consider sending a donation to 1Gideon33Q7ANGhCbfkxPHpWoNGz5Lyskm

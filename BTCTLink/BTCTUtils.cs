@@ -1,10 +1,18 @@
-﻿using System;
+﻿/* -- BTCTUtils -- Utility functions for the BTCTLink class --
+ * 
+ * Developed by Rannasha (Bitcointalk.org: https://bitcointalk.org/index.php?action=profile;u=112258)
+ * 
+ * This file introduces the BTCTUtils class, containing static methods for various
+ * variable-conversions made by the BTCTLink class.
+ * 
+ * For details and instructions, consult readme.md.
+ */
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Globalization;
-
 
 namespace BTCTC
 {
