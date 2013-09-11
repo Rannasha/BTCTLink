@@ -961,6 +961,7 @@ namespace BTCTC
         {
             List<QueryParameter> p = new List<QueryParameter>();
 
+            p.Add(new QueryParameter("act","cancel_order"));
             p.Add(new QueryParameter("order_id", orderId.ToString()));
 
             try
